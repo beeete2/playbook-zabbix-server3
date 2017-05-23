@@ -1,0 +1,62 @@
+---
+
+- block:
+  - name: install zabbix repository
+    yum:
+      name: http://repo.zabbix.com/zabbix/3.0/rhel/7/x86_64/zabbix-release-3.0-1.el7.noarch.rpm
+      state: installed
+
+  - name: install zabbix server and agent and more utility packages
+    yum:
+      name: "{{ item }}"
+      enablerepo: remi-php56
+      state: installed
+    with_items:
+      - zabbix-server-mysql
+      - zabbix-web-mysql
+      - zabbix-web-japanese
+      - zabbix-agent
+      - zabbix-get
+      - zabbix-sender
+
+  - name: check to imported schema file
+    shell: mysqlshow zabbix | grep users | wc -l
+    become: yes
+    register: imported
+    changed_when: False
+
+  - name: importing schema file
+    shell: "zcat /usr/share/doc/zabbix-server-mysql-*/create.sql.gz | mysql -u{{ zabbix_database.dbuser }} -p{{ zabbix_database.dbpassword | default(mariadb_default_user_password) }} {{ zabbix_database.dbname }}"
+    when: imported.stdout == "0"
+
+  - name: configure config for zabbix server
+    lineinfile:
+      dest: /etc/zabbix/zabbix_server.conf
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+      insertafter: "{{ item.insertafter | default('') }}"
+    with_items:
+      - regexp: ^DBName=
+        line: "DBName={{ zabbix_database.dbname }}"
+      - regexp: ^DBUser=
+        line: "DBUser={{ zabbix_database.dbuser }}"
+      - regexp: ^DBPassword=
+        line: "DBPassword={{ zabbix_database.dbpassword | default(mariadb_default_user_password) }}"
+        insertafter: '# DBPassword='
+    notify: restart zabbix server
+
+  - name: configure zabbix.conf for apache
+    lineinfile:
+      dest: /etc/httpd/conf.d/zabbix.conf
+      regexp: "php_value date.timezone"
+      line: "        php_value date.timezone {{ timezone }}"
+    notify: restart httpd server
+
+  - name: start zabbix server and auto start
+    systemd:
+      name: zabbix-server
+      state: started
+      enabled: yes
+
+  tags:
+    - zabbix3

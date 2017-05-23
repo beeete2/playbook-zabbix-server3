@@ -1,0 +1,11 @@
+- hosts: zabbix-server
+  vars_files:
+    - vars/main.yml
+    - vars/private.yml
+  roles:
+    - pf
+    - chrony
+    - apache24
+    - mariadb
+    - php56
+    - zabbix3

@@ -1,0 +1,7 @@
+---
+timezone: "Asia/Tokyo"
+zabbix_database:
+  dbname: "zabbix"
+  dbuser: "zabbix"
+apache_vhosts: []
+apache_vhosts_ssl: []
